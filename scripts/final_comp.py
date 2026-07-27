@@ -4,6 +4,7 @@ from pathlib import Path
 import polars as pl
 from string__downloader import download_string_data  
 from load_data import load_data
+from data_analyzer import DataAnalyzer
 
 def normalize_string_id_column(lf: pl.LazyFrame) -> pl.LazyFrame:
     string_col = "string_protein_id" if "string_protein_id" in lf.columns else "#string_protein_id"
@@ -13,79 +14,29 @@ def normalize_string_id_column(lf: pl.LazyFrame) -> pl.LazyFrame:
 def load_and_map_data(data_dir_path):
     data_dir = Path(data_dir_path)
     
-    df2 = download_string_data(data_id="protein.physical.links.detailed", cols_to_clean=["protein1", "protein2"])
+    df2 = download_string_data(data_id="protein.physical.links.detailed", organism_id=4932,cols_to_clean=["protein1", "protein2"])
     string_aliases = download_string_data(data_id="protein.aliases")
     string_info = download_string_data(data_id="protein.info")
 
-    pairs, confidences = load_data("data/")
+    pairs, confideences = load_data(str(data_dir))
+    unique_proteins =(
+        pl.concat([
+            pairs.select(pl.col("af3_id1").alias("protein_id")),
+            pairs.select(pl.col("af3_id2").alias("protein_id"))
+        ]).drop_nulls().unique().sort("protein_id"))
 
-    unique_proteins = (pl.concat([
-        pairs.select(pl.col("af3_id1").alias("protein_id")),
-        pairs.select(pl.col("af3_id2").alias("protein_id"))
-    ]).drop_nulls().unique().sort("protein_id"))
-
-    base_map = pl.concat([
+    map = pl.concat([
         pairs.select([
             pl.col("af3_id1").alias("uniprot_id"),
-            pl.col("michaelis2023:Source Gene names (SGD/UniProt-primary or ordered locus)").alias("gene_name"),
+            pl.col()
         ]),
         pairs.select([
             pl.col("af3_id2").alias("uniprot_id"),
-            pl.col("michaelis2023:Target Gene names  (SGD/UniProt-primary or ordered locus)").alias("gene_name"),
+            pl.col("")
         ])
-    ]).drop_nulls().unique(subset=["uniprot_id"])
-
-    already_mapped_ids = base_map.select("uniprot_id").collect().get_column("uniprot_id").to_list()
-    need_api = unique_proteins.filter(pl.col("protein_id").is_in(already_mapped_ids).not_())
-
-    clean_aliases = (
-        string_aliases
-        .rename({"alias": "protein_id"})
-        .pipe(normalize_string_id_column)
-        .with_columns(pl.col("protein_id").str.to_lowercase())
-        .filter(pl.col("source").str.contains("UniProt"))
-    )
-    matched_missing = (
-        need_api.join(clean_aliases, on="protein_id", how="inner")
-        .select([pl.col("protein_id").alias("uniprot_id"), pl.col("string_id")])
-        .unique()
-    )
-
-    clean_info = normalize_string_id_column(string_info)
-    full_matches = matched_missing.join(clean_info, on="string_id", how="inner") 
-    #need .select([pl.col("uniprot_id"),pl.col("string_id"), pl.col("preferred_name").alias("string_gene_name"),pl.col("annotation")
-
-    df_matches_unique = full_matches.unique(subset=['uniprot_id'], keep='first').collect() 
-    id_map_dict = dict(zip(df_matches_unique['uniprot_id'], df_matches_unique['string_id']))
-
-    pairs_2 = pairs.select([
-        pl.col("af3_id1").alias("protein1"), pl.col("af3_id2").alias("protein2"),
-        pl.col("chain_pair_iptm_best"), pl.col("chain_pair_iptm_mean")
-    ]).drop_nulls().unique()
-
-    # using pairs_2 protein1 and protein2 to make a new map
-    df_alphafold_mapped = pairs_2.with_columns([
-        pl.col("protein1").replace(id_map_dict, default=None).alias("string_id1"),
-        pl.col("protein2").replace(id_map_dict, default=None).alias("string_id2")
     ])
-    print(len(df_alphafold_mapped.collect()))
 
-    df_all_mapped = df_alphafold_mapped.with_columns(
-        pl.min_horizontal("string_id1", "string_id2").alias("pair_key1"),
-        pl.max_horizontal("string_id1", "string_id2").alias("pair_key2")
-    )
-
-    df2_2 = df2.select(["protein1", "protein2", "combined_score"]).unique()
-    df_string_ordered = df2_2.with_columns(
-        pl.min_horizontal("protein1", "protein2").alias("pair_key1"),
-        pl.max_horizontal("protein1", "protein2").alias("pair_key2")
-    )
-    df_string_unique_pairs = df_string_ordered.select(["pair_key1", "pair_key2", "combined_score"]).unique(subset=["pair_key1", "pair_key2"])
-
-    df_final_comparison = df_all_mapped.join(
-        df_string_unique_pairs, on=["pair_key1", "pair_key2"], how="left"
-    ).drop("pair_key1", "pair_key2")
-    return df_final_comparison.collect()
+    # return df_final_comparison.collect()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Global Score Pipeline Wrapper")
