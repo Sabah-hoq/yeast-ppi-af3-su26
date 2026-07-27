@@ -29,6 +29,7 @@ class DataAnalyzer:
                 "af3_id1",
                 "af3_id2",
                 "chain_pair_iptm_best",
+                "chain_pair_iptm_mean",
                 "ptm",
                 "iptm",
             ]
