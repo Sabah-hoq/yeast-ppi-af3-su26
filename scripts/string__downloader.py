@@ -1,5 +1,6 @@
 ## Copying from here: https://github.com/jurgjn/pooled-ppi/blob/main/src/pooled_ppi/string_db.py
 #!/usr/bin/env python3
+from pathlib import Path
 import polars as pl
 from cached_path import cached_path
 
@@ -42,17 +43,42 @@ def download_string_data(
 
     return lf
 
+
+def save_lazyframe_to_data(lf: pl.LazyFrame, filename: str, data_dir: Path | None = None) -> Path:
+    if data_dir is None:
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    output_path = data_dir / filename
+    lf.collect().write_csv(output_path)
+    print(f"Saved {output_path}")
+    return output_path
+
+
 if __name__ == "__main__":
     print("Testing yeast data download with Polars...")
-    
+
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
     physical_links_lf = download_string_data(
         data_id="protein.physical.links.detailed",
         organism_id=4932,
         cols_to_clean=["protein1", "protein2"]
-    )   
+    )
     protein_aliases_lf = download_string_data(
         data_id="protein.aliases",
         organism_id=4932,
     )
+
+    protein_info_lf = download_string_data(
+            data_id="protein.info",
+            organism_id=4932,
+        )
+
+    save_lazyframe_to_data(physical_links_lf, "4932.protein.physical.links.detailed.v12.0.txt", data_dir)
+    save_lazyframe_to_data(protein_aliases_lf, "4932.protein.aliases.v12.0.txt", data_dir)
+    save_lazyframe_to_data(protein_info_lf, "4932.protein.info.v12.0.txt", data_dir)
+
     print(protein_aliases_lf.head().collect())
     print(len(protein_aliases_lf.collect()))
