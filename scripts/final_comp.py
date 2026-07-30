@@ -28,14 +28,113 @@ def load_and_map_data(data_dir_path):
     map = pl.concat([
         pairs.select([
             pl.col("af3_id1").alias("uniprot_id"),
-            pl.col()
+            pl.col("michaelis2023:Source Gene names (SGD/UniProt-primary or ordered locus)").alias("gene_name"),
         ]),
         pairs.select([
             pl.col("af3_id2").alias("uniprot_id"),
-            pl.col("")
+            pl.col("michaelis2023:Target Gene names  (SGD/UniProt-primary or ordered locus)").alias("gene_name"),
         ])
-    ])
+    ]).drop_nulls().unique(subset=["uniprot_id"])
 
+    already_mapped_ids = map.select("uniprot_id").collect().get_column("uniprot_id").to_list()
+    need_api = unique_proteins.filter(pl.col("protein_id").is_in(already_mapped_ids).not_())
+    
+    clean_aliases = (
+        string_aliases
+        .rename({"alias": "protein_id"})
+        .pipe(normalize_string_id_column)
+        .with_columns(pl.col("protein_id").str.to_lowercase())
+        .filter(pl.col("source").str.contains("UniProt"))
+        )
+    
+    clean_info = normalize_string_id_column(string_info)
+    
+    all_mapped = (
+            unique_proteins.join(clean_aliases, on="protein_id", how="inner")
+            .select([pl.col("protein_id").alias("uniprot_id"), pl.col("string_id")])
+            .join(clean_info, on="string_id", how="inner")
+            .unique(subset=["uniprot_id"])
+        )
+    
+    df_matches_unique = all_mapped.collect()
+    id_map_dict = dict(zip(df_matches_unique['uniprot_id'], df_matches_unique['string_id']))
+    
+    pairs_2 = pairs.select([
+            pl.col("af3_id1").alias("protein1"), pl.col("af3_id2").alias("protein2"),
+            pl.col("chain_pair_iptm_best"), pl.col("chain_pair_iptm_mean")
+        ]).drop_nulls().unique()
+
+    
+    
+        # using pairs_2 protein1 and protein2 to make a new map
+    df_alphafold_mapped = pairs_2.with_columns([
+            pl.col("protein1").replace(id_map_dict, default=None).alias("string_id1"),
+            pl.col("protein2").replace(id_map_dict, default=None).alias("string_id2")
+        ])
+    
+        # FIX 3: drop rows where the mapping didn't resolve, so they don't
+        # inflate the final row count with unmatchable garbage rows.
+    df_alphafold_mapped = df_alphafold_mapped.drop_nulls(subset=["string_id1", "string_id2"])
+    
+    df_all_mapped = df_alphafold_mapped.with_columns(
+            pl.min_horizontal("string_id1", "string_id2").alias("pair_key1"),
+            pl.max_horizontal("string_id1", "string_id2").alias("pair_key2")
+        )
+
+    matched = (
+    map.join(
+        string_aliases,
+        on="protein_id",
+        how="inner"
+    )
+    .select([
+        pl.col("protein_id").alias("uniprot_id"),
+        pl.col("string_id")
+    ])
+    .unique()
+    )
+
+    string_info2 = (
+        pl.scan_csv(
+            str(data_dir / "4932.protein.info.v12.0.txt"),
+            separator="\t"
+        )
+        .rename({"#string_protein_id": "string_id"})
+    )
+
+    full_matches = (
+        matched_missing.join(
+            string_info2,
+            on="string_id",
+            how="inner"
+        )
+        .select([
+            pl.col("uniprot_id"),
+            pl.col("string_id"),
+            pl.col("preferred_name").alias("string_gene_name"),
+            pl.col("annotation")
+        ])
+    )
+
+    df_matches = full_matches.collect()
+    print(f"Found local STRING matches for {df_matches.height} of your missing IDs!")
+    print(df_matches.head())
+    print(len(df_matches))
+
+        
+    df2_2 = df2.select(["protein1", "protein2", "combined_score"]).unique()
+
+    df_string_ordered = df2_2.with_columns(
+            pl.min_horizontal("protein1", "protein2").alias("pair_key1"),
+            pl.max_horizontal("protein1", "protein2").alias("pair_key2")
+        )
+    df_string_unique_pairs = df_string_ordered.select(["pair_key1", "pair_key2", "combined_score"]).unique(subset=["pair_key1", "pair_key2"])
+    
+    df_final_comparison = df_all_mapped.join(
+            df_string_unique_pairs, on=["pair_key1", "pair_key2"], how="left"
+        ).drop("pair_key1", "pair_key2")
+    
+    return df_final_comparison.collect()
     # return df_final_comparison.collect()
 
 if __name__ == "__main__":
