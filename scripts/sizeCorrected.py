@@ -25,13 +25,6 @@ top_edges3_normal = df_filtered.with_columns(
 print(len(top_edges3_normal.collect()))
 print((top_edges3_normal.collect())["chain_pair_iptm_mean_corrected"].describe())
 
-# plot 
-fig, ax = plt.subplots()
-plt.hist((top_edges3_normal.collect())["chain_pair_iptm_mean_corrected"], bins=50000, color='teal', edgecolor='black', alpha=0.5)
-ax.ticklabel_format(style='plain', axis='y')
-ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
-plt.show()
-
 # Saving file in spras format using final_comp,csv
 ready_file = top_edges3_normal.select([
     pl.col("chain_pair_iptm_mean_corrected").alias("weight"),
@@ -48,6 +41,12 @@ ready_file = ready_file.with_columns(direction=pl.lit("U"))
 ready_file = ready_file.select(["protein1","protein2","weight","direction"])
 
 print(ready_file.collect().head())
+ready_file_df = ready_file.collect()
 
-Path("../outputs/spras").mkdir(parents=True, exist_ok=True)
-ready_file.collect().write_csv("../outputs/spras/yeast_spras.txt", include_header=False)
+# Save file
+repo_root = Path(__file__).resolve().parents[1]
+output_dir = repo_root / "outputs" / "spras"
+output_dir.mkdir(parents=True, exist_ok=True)
+output_path = output_dir / "yeast_spras.txt"
+ready_file_df.write_csv(output_path, include_header=False)
+print(f"CSV saved successfully at: {output_path}")
