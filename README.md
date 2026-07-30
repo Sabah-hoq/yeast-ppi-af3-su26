@@ -56,7 +56,7 @@ The code from this file was copied from this [script](https://github.com/jurgjn/
 
 * [protein alias](https://stringdb-downloads.org/download/protein.aliases.v12.0/4932.protein.aliases.v12.0.txt.gz)
 * [protein information](https://stringdb-downloads.org/download/protein.info.v12.0/4932.protein.info.v12.0.txt.gz)
-* [protein physical links detailed]([https://stringdb-downloads.org/download/protein.links.detailed.v12.0/4932.protein.links.detailed.v12.0.txt.gz](https://stringdb-downloads.org/download/protein.physical.links.detailed.v12.0/4932.protein.physical.links.detailed.v12.0.txt.gz))
+* [protein physical links detailed](https://stringdb-downloads.org/download/protein.physical.links.detailed.v12.0/4932.protein.physical.links.detailed.v12.0.txt.gz)
 ---
 ### Understanding ipTM & STRING scores
 
