@@ -1,11 +1,7 @@
-# Yeast PPI AF3 
+# yeast
 ---
 ### Background 
 Analyzing data from [GitHub repo](https://github.com/jurgjn/pooled-ppi-yeast). 
-
-This repo goes over.. 
-
-Yeast protein-protein interactions (PPI) are important for understanding...
 
 #### __Docker Data__
 To pull data, run this line of code (approx. 30 GB). More information about the Docker Image can be found [here](https://hub.docker.com/r/jurgjn/pooled-ppi-yeast/tags). This has all the data needed to perform analysis 
@@ -15,16 +11,15 @@ docker run -p 8501:8501 jurgjn/pooled-ppi-yeast:v26.1
 ```
 After running, the raw data of the proteins is most likely stored in `predictions-db`; the data I will extract/copy is `summary_confidences.parquet` and `summary_pairs.parquet` which are in `workspaces/data`.
 
-_The lines below are for windows PowerShell_
 
+_The lines below are for windows PowerShell_
 ```{shell}
 > New-Item -Path "C:\yeast_data" -ItemType Directory -Force
 > docker cp <container_name>:/workspace/data/summary_pairs.parquet C:\yeast_data\summary_pairs.parquet
 > docker cp <container_name>:/workspace/data/summary_confidences.parquet C:\yeast_data\summary_confidences.parquet
 > explorer C:\yeast_data
 ```
-*MacOS & Linux Code*: 
-
+MacOS Code:
 ```{bash}
 > mkdir -p ~/yeast_data
 > docker cp <container_name>:/workspace/data/summary_pairs.parquet ~/yeast_data/summary_pairs.parquet
@@ -61,29 +56,13 @@ The code from this file was copied from this [script](https://github.com/jurgjn/
 
 * [protein alias](https://stringdb-downloads.org/download/protein.aliases.v12.0/4932.protein.aliases.v12.0.txt.gz)
 * [protein information](https://stringdb-downloads.org/download/protein.info.v12.0/4932.protein.info.v12.0.txt.gz)
-* [protein physical links detailed](https://stringdb-downloads.org/download/protein.links.detailed.v12.0/4932.protein.links.detailed.v12.0.txt.gz)
+* [protein physical links detailed](https://stringdb-downloads.org/download/protein.physical.links.detailed.v12.0/4932.protein.physical.links.detailed.v12.0.txt.gz)
 ---
 ### Understanding ipTM & STRING scores
 
-
----
-### File Decription
+### Files 
 
 **Cytoscape**
 
-There is one file already in the `cytoscape` folder, `yeast_network.cys`. This file when downloaded, you can view the pathways of the yeast PPI from AF3. However, the datasets used have been trimmed/filtered, as the original unfiltered dataset had 7.6 million + edges, and Cytoscape does not have the memory capabilities for this. So, the script, `cytoscape.py` grabs a file from the data folder and and filters the ipTM and STRING scores where it is at a signigicant threshold. This is done for both the ipTM mean and best scores, and then visualzied using Cytoscape. 
-
-**Notebooks**
-
-A notebook folder containing jupyter notebooks were made so that visualization of the and process can be seen step-by-step. Notebooks were made for mapping the data, creation of PR and ROC curves, and making a SPRAS ready edge file. 
-
-**Outputs**
-
-This has all the outputs that were made over the process of filtering and visualizations. There are mutiple figures (there is a README file with more information on each figure) and the ROC and PR curves. Besides figures a SPRAS ready edge file will here (not here yet). 
-
-**Scripts**
-
-**There is a README file in this folder with a better description of each script that is made.*
-
-`string_downloader.py` and `load_data.py` generate data that is used for data reading and generation. <- need to test on local machine
+There is one file already in the `cytoscape` folder, `yeast_network.cys`. This file when downloaded, you can view the pathways of the yeast PPI from AF3. However, the datasets used have been trimmed/filtered, as the original unfiltered dataset had 7.6 million + edges, and Cytoscape does not have the memory capabilities for this. So, the script, [`cytoscape.py`](xdg-open ~/yeast_data) grabs a file from the data folder and and filters the ipTM and STRING scores where it is at a signigicant threshold. This is done for both the ipTM mean and best scores, and then visualzied using Cytoscape. 
 
