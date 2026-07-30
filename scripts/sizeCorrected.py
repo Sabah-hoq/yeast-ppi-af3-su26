@@ -1,25 +1,12 @@
-# May crash when running...dont run
+# Imports 
 from pathlib import Path
 import polars as pl
 import matplotlib.pyplot as plt
-from scipy import stats
-import numpy as np
-import seaborn as sns
 from load_data import load_data
-from sklearn.metrics import  roc_curve, auc, roc_auc_score
-from sklearn.metrics import precision_recall_curve, auc, average_precision_score
 
 # Use final_comp.csv for Data 
 pairs, confidences = load_data("data/")
 sizeCoreceted = (pairs.collect())["chain_pair_iptm_mean_corrected"]
-
-# fig, ax = plt.subplots()
-# plt.hist(sizeCoreceted, bins=100000, color='teal', edgecolor='black', alpha=0.5)
-# ax.ticklabel_format(style='plain', axis='y')
-# ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
-# plt.xlim(-0.015, 0.8)
-# # Display the plot
-# plt.show()
 
 # filtering data
 df_filtered = pairs.filter(pl.col("chain_pair_iptm_mean_corrected") >= 0.061) 
@@ -45,17 +32,22 @@ ax.ticklabel_format(style='plain', axis='y')
 ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,}".format(int(x))))
 plt.show()
 
-# More figures below for visualization 
-sns.set_theme(style="whitegrid")
-fig,ax = plt.subplots(1,2, figsize=(14,5))
-sns.histplot(
-    sizeCoreceted,
-    bins = 1000,
-    kde=True,
-    color="#5157a1",
-    edgecolor = None, 
-    stat="density",)
-ax.set_title(
-    "iptm scoresize corrected (unfiltered)"
-)
-ax.legend()
+# Saving file in spras format using final_comp,csv
+ready_file = top_edges3_normal.select([
+    pl.col("chain_pair_iptm_mean_corrected").alias("weight"),
+    pl.col("af3_id1").alias("protein1"),
+    pl.col("af3_id2").alias("protein2"),
+])
+
+ready_file = ready_file.with_columns(
+        pl.col("protein1").str.to_uppercase(),
+        pl.col("protein2").str.to_uppercase()
+    )
+
+ready_file = ready_file.with_columns(direction=pl.lit("U"))
+ready_file = ready_file.select(["protein1","protein2","weight","direction"])
+
+print(ready_file.collect().head())
+
+Path("../outputs/spras").mkdir(parents=True, exist_ok=True)
+ready_file.collect().write_csv("../outputs/spras/yeast_spras.txt", include_header=False)
