@@ -50,6 +50,45 @@ plt.savefig(output_path, dpi=600, bbox_inches='tight')
 plt.show()
 
 # iptmBest_stringScore.png figure 
+sns.set_theme(style="whitegrid")
 
+g2 = sns.jointplot(
+    data=df_final_comparison_sig2, 
+    x='combined_score', 
+    y='chain_pair_iptm_best', 
+    kind='reg',
+    scatter=False)
+
+scatter = g2.ax_joint.scatter(
+    data=df_final_comparison_sig2,
+    x='combined_score',
+    y='chain_pair_iptm_best',
+    c=df_final_comparison_sig2['combined_score'], 
+    cmap='viridis',
+    edgecolor='w',                            
+    linewidth=0.5
+)
+
+plt.show()
 
 # iptmMean_stringScore.png figure 
+sns.set_theme(style="whitegrid")
+
+g = sns.jointplot(
+    data=df_final_comparison_sig, 
+    x='combined_score', 
+    y='chain_pair_iptm_mean', 
+    kind='reg',
+    scatter=False)
+
+scatter = g.ax_joint.scatter(
+    data=df_final_comparison_sig,
+    x='combined_score',
+    y='chain_pair_iptm_mean',
+    c=df_final_comparison_sig['combined_score'], 
+    cmap='viridis',
+    edgecolor='w',                            
+    linewidth=0.5
+)
+
+plt.show()

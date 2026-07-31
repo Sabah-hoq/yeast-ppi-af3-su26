@@ -10,6 +10,7 @@ cytoscape/df_final_comparison_best.csv
 cytoscape/df_final_comparison_mean.csv
 outputs/../*.csv
 outputs/../*.parquet
+.vscode
 # Ignore all CSV files anywhere in the project
 *.csv
 

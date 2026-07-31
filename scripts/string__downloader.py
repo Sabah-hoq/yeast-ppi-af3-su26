@@ -64,8 +64,7 @@ if __name__ == "__main__":
 
     physical_links_lf = download_string_data(
         data_id="protein.physical.links.detailed",
-        organism_id=4932,
-        cols_to_clean=["protein1", "protein2"]
+        organism_id=4932
     )
     protein_aliases_lf = download_string_data(
         data_id="protein.aliases",
