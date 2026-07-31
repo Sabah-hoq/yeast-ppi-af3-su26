@@ -142,8 +142,6 @@ if __name__ == "__main__":
     parser.add_argument("--data-dir", type=str, required=True, help="Path to local data folder (with summary_pairs.parquet)")
     parser.add_argument("--output", type=str, default="final_comp.csv", help="output filename")
     args = parser.parse_args()
-    
-    print("Running mapping pipeline standalone...")
 
     final_df = load_and_map_data(args.data_dir)
     
