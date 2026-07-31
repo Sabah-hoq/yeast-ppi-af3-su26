@@ -56,14 +56,29 @@ def load_and_map_data(data_dir_path):
         string_aliases
         .rename({"alias": "protein_id"})
         .pipe(normalize_string_id_column)
-        .with_columns(pl.col("protein_id").str.to_lowercase())
+        .with_columns(
+            pl.col("protein_id")
+            .cast(pl.String)
+            .str.strip_chars()
+            .str.to_lowercase()
+            .alias("protein_id_norm")
+        )
+        .rename({"protein_id": "alias_protein_id"})
         .filter(pl.col("source").str.contains("UniProt"))
         )
     
     clean_info = normalize_string_id_column(string_info)
     
     all_mapped = (
-            unique_proteins.join(clean_aliases, on="protein_id", how="inner")
+            unique_proteins
+            .with_columns(
+                pl.col("protein_id")
+                .cast(pl.String)
+                .str.strip_chars()
+                .str.to_lowercase()
+                .alias("protein_id_norm")
+            )
+            .join(clean_aliases, left_on="protein_id_norm", right_on="protein_id_norm", how="inner")
             .select([pl.col("protein_id").alias("uniprot_id"), pl.col("string_id")])
             .join(clean_info, on="string_id", how="inner")
             .unique(subset=["uniprot_id"])
@@ -74,7 +89,8 @@ def load_and_map_data(data_dir_path):
     
     pairs_2 = pairs.select([
             pl.col("af3_id1").alias("protein1"), pl.col("af3_id2").alias("protein2"),
-            pl.col("chain_pair_iptm_best"), pl.col("chain_pair_iptm_mean")
+            pl.col("chain_pair_iptm_best"), pl.col("chain_pair_iptm_mean"),
+            pl.col("chain_pair_iptm_mean_corrected"), pl.col("chain_pair_iptm_best_corrected")
         ]).drop_nulls().unique()
 
         # using pairs_2 protein1 and protein2 to make a new map
@@ -86,22 +102,37 @@ def load_and_map_data(data_dir_path):
     df_alphafold_mapped = df_alphafold_mapped.drop_nulls(subset=["string_id1", "string_id2"])
     
     df_all_mapped = df_alphafold_mapped.with_columns(
-            pl.min_horizontal("string_id1", "string_id2").alias("pair_key1"),
-            pl.max_horizontal("string_id1", "string_id2").alias("pair_key2")
+            pl.min_horizontal(
+                pl.col("string_id1").cast(pl.String).str.strip_chars().str.to_lowercase(),
+                pl.col("string_id2").cast(pl.String).str.strip_chars().str.to_lowercase()
+            ).alias("pair_key1"),
+            pl.max_horizontal(
+                pl.col("string_id1").cast(pl.String).str.strip_chars().str.to_lowercase(),
+                pl.col("string_id2").cast(pl.String).str.strip_chars().str.to_lowercase()
+            ).alias("pair_key2")
         )
 
     df2_2 = df2.select(["protein1", "protein2", "combined_score"]).unique()
 
     df_string_ordered = df2_2.with_columns(
-            pl.min_horizontal("protein1", "protein2").alias("pair_key1"),
-            pl.max_horizontal("protein1", "protein2").alias("pair_key2")
+            pl.min_horizontal(
+                pl.col("protein1").cast(pl.String).str.strip_chars().str.to_lowercase(),
+                pl.col("protein2").cast(pl.String).str.strip_chars().str.to_lowercase()
+            ).alias("pair_key1"),
+            pl.max_horizontal(
+                pl.col("protein1").cast(pl.String).str.strip_chars().str.to_lowercase(),
+                pl.col("protein2").cast(pl.String).str.strip_chars().str.to_lowercase()
+            ).alias("pair_key2")
         )
     df_string_unique_pairs = df_string_ordered.select(["pair_key1", "pair_key2", "combined_score"]).unique(subset=["pair_key1", "pair_key2"])
     print(df_string_unique_pairs.collect()["combined_score"])
+
     df_final_comparison = df_all_mapped.join(
             df_string_unique_pairs, on=["pair_key1", "pair_key2"], how="left"
         ).drop("pair_key1", "pair_key2")
+    
     print(df_final_comparison.collect()["combined_score"])
+    # df_final_comparison = df_final_comparison.drop_nulls(subset=["combined_score"])
     
     return df_final_comparison.collect()
 
