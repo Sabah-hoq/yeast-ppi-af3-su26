@@ -11,7 +11,6 @@ def download_string_data(
     string_db_version: str = "v12.0"
 ) -> pl.LazyFrame:
     """
-
     data_id : str
         The type of dataset to download (e.g., 'protein.physical.links.detailed', 'protein.aliases', 'protein.info')
     organism_id : int
@@ -25,15 +24,12 @@ def download_string_data(
     if data_id in {"protein.aliases", "protein.info"}:
         separator = "\t"
     url = f"https://stringdb-downloads.org/download/{data_id}.{string_db_version}/{organism_id}.{data_id}.{string_db_version}.txt.gz"
+
     print(f"Fetching/Loading from cache: {url}")
+    
     local_path = cached_path(url)
 
     lf = pl.scan_csv(str(local_path), separator=separator)
-
-    schema_cols = lf.collect_schema().names()
-    rename_map = {col: col.lstrip("#") for col in schema_cols if col.startswith("#")}
-    if rename_map:
-        lf = lf.rename(rename_map)
 
     if cols_to_clean:
         prefix_pattern = fr"^{organism_id}\."
@@ -44,13 +40,18 @@ def download_string_data(
     return lf
 
 
-def save_lazyframe_to_data(lf: pl.LazyFrame, filename: str, data_dir: Path | None = None) -> Path:
+def save_lazyframe_to_data(
+    lf: pl.LazyFrame,
+    filename: str,
+    data_dir: Path | None = None,
+    separator: str = ",",
+) -> Path:
     if data_dir is None:
         data_dir = Path(__file__).resolve().parent.parent / "data"
 
     data_dir.mkdir(parents=True, exist_ok=True)
     output_path = data_dir / filename
-    lf.collect().write_csv(output_path)
+    lf.collect().write_csv(output_path, separator=separator)
     print(f"Saved {output_path}")
     return output_path
 
@@ -76,9 +77,9 @@ if __name__ == "__main__":
             organism_id=4932,
         )
 
-    save_lazyframe_to_data(physical_links_lf, "4932.protein.physical.links.detailed.v12.0.txt", data_dir)
-    save_lazyframe_to_data(protein_aliases_lf, "4932.protein.aliases.v12.0.txt", data_dir)
-    save_lazyframe_to_data(protein_info_lf, "4932.protein.info.v12.0.txt", data_dir)
+    save_lazyframe_to_data(physical_links_lf, "4932.protein.physical.links.detailed.v12.0.txt", data_dir, separator=" ")
+    save_lazyframe_to_data(protein_aliases_lf, "4932.protein.aliases.v12.0.txt", data_dir, separator="\t")
+    save_lazyframe_to_data(protein_info_lf, "4932.protein.info.v12.0.txt", data_dir, separator="\t")
 
     print(protein_aliases_lf.head().collect())
     print(len(protein_aliases_lf.collect()))
