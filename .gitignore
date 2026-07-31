@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache
 # Ignore the entire data directory and its contents
 data/
+tests/
 # Ignore specific files if you want to keep other things in those folders
 cytoscape/df_final_comparison_best.csv
 cytoscape/df_final_comparison_mean.csv
