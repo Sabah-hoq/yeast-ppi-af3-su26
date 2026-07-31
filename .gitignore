@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+.vscode/
+.pytest_cache
 # Ignore the entire data directory and its contents
 data/
 tests/
