@@ -8,7 +8,12 @@ from data_analyzer import DataAnalyzer
 
 def normalize_string_id_column(lf: pl.LazyFrame) -> pl.LazyFrame:
     string_col = "string_protein_id" if "string_protein_id" in lf.columns else "#string_protein_id"
-    return lf.rename({string_col: "string_id"})
+    return (
+        lf.rename({string_col: "string_id"})
+        .with_columns(
+            pl.col("string_id").str.replace(r"^4932\.", "", literal=True).alias("string_id")
+        )
+    )
 
 
 def load_and_map_data(data_dir_path):
@@ -49,15 +54,44 @@ def load_and_map_data(data_dir_path):
     
     clean_info = normalize_string_id_column(string_info)
     
-    all_mapped = (
-            unique_proteins.join(clean_aliases, on="protein_id", how="inner")
-            .select([pl.col("protein_id").alias("uniprot_id"), pl.col("string_id")])
-            .join(clean_info, on="string_id", how="inner")
-            .unique(subset=["uniprot_id"])
-        )
-    
-    df_matches_unique = all_mapped.collect()
-    id_map_dict = dict(zip(df_matches_unique['uniprot_id'], df_matches_unique['string_id']))
+    matched_missing = (
+        need_api.join(clean_aliases, on="protein_id", how="inner")
+        .select([pl.col("protein_id").alias("uniprot_id"), pl.col("string_id")])
+        .unique()
+    )
+
+    df_matches = (
+        matched_missing.join(clean_info, on="string_id", how="inner")
+        .select([
+            pl.col("uniprot_id"),
+            pl.col("string_id"),
+            pl.col("preferred_name").alias("string_gene_name"),
+            pl.col("annotation"),
+        ])
+        .collect()
+    )
+
+    unique_proteins_mapped = (
+        unique_proteins.join(clean_aliases, on="protein_id", how="inner")
+        .select([pl.col("protein_id").alias("uniprot_id"), pl.col("string_id")])
+        .join(clean_info, on="string_id", how="inner")
+        .select([
+            pl.col("uniprot_id"),
+            pl.col("string_id"),
+            pl.col("preferred_name").alias("string_gene_name"),
+            pl.col("annotation"),
+        ])
+        .unique(subset=["uniprot_id"])
+        .collect()
+    )
+
+    df_matches_unique = df_matches.unique(subset=["uniprot_id"], keep="first")
+    df_final_mapping = (
+        unique_proteins_mapped.unique(subset=["uniprot_id"], keep="first")
+        .join(df_matches_unique, on="uniprot_id", how="left")
+        .select(pl.exclude(r"^.*_right$"))
+    )
+    id_map_dict = dict(zip(df_final_mapping["uniprot_id"], df_final_mapping["string_id"]))
     
     pairs_2 = pairs.select([
             pl.col("af3_id1").alias("protein1"), pl.col("af3_id2").alias("protein2"),
@@ -76,10 +110,17 @@ def load_and_map_data(data_dir_path):
         # inflate the final row count with unmatchable garbage rows.
     df_alphafold_mapped = df_alphafold_mapped.drop_nulls(subset=["string_id1", "string_id2"])
     
-    df_all_mapped = df_alphafold_mapped.with_columns(
-            pl.min_horizontal("string_id1", "string_id2").alias("pair_key1"),
-            pl.max_horizontal("string_id1", "string_id2").alias("pair_key2")
+    df_all_mapped = (
+        df_alphafold_mapped.with_columns(
+            pl.col("string_id1").str.replace(r"^4932\.", "", literal=True).alias("string_id1_norm"),
+            pl.col("string_id2").str.replace(r"^4932\.", "", literal=True).alias("string_id2_norm"),
         )
+        .with_columns(
+            pl.min_horizontal("string_id1_norm", "string_id2_norm").alias("pair_key1"),
+            pl.max_horizontal("string_id1_norm", "string_id2_norm").alias("pair_key2"),
+        )
+        .drop(["string_id1_norm", "string_id2_norm"])
+    )
 
     matched = (
     map.join(
@@ -93,49 +134,37 @@ def load_and_map_data(data_dir_path):
     ])
     .unique()
     )
-
     string_info2 = (
         pl.scan_csv(
             str(data_dir / "4932.protein.info.v12.0.txt"),
             separator="\t"
         )
         .rename({"#string_protein_id": "string_id"})
-    )
-
-    full_matches = (
-        matched_missing.join(
-            string_info2,
-            on="string_id",
-            how="inner"
-        )
-        .select([
-            pl.col("uniprot_id"),
-            pl.col("string_id"),
-            pl.col("preferred_name").alias("string_gene_name"),
-            pl.col("annotation")
-        ])
-    )
-
-    df_matches = full_matches.collect()
-    print(f"Found local STRING matches for {df_matches.height} of your missing IDs!")
-    print(df_matches.head())
-    print(len(df_matches))
-
-        
+    ) 
     df2_2 = df2.select(["protein1", "protein2", "combined_score"]).unique()
+    print(df2_2.collect().head())
 
-    df_string_ordered = df2_2.with_columns(
-            pl.min_horizontal("protein1", "protein2").alias("pair_key1"),
-            pl.max_horizontal("protein1", "protein2").alias("pair_key2")
+    df_string_ordered = (
+        df2_2.with_columns(
+            pl.col("protein1").str.replace(r"^4932\.", "", literal=True).alias("protein1_norm"),
+            pl.col("protein2").str.replace(r"^4932\.", "", literal=True).alias("protein2_norm"),
         )
+        .with_columns(
+            pl.min_horizontal("protein1_norm", "protein2_norm").alias("pair_key1"),
+            pl.max_horizontal("protein1_norm", "protein2_norm").alias("pair_key2"),
+        )
+        .drop(["protein1_norm", "protein2_norm"])
+    )
     df_string_unique_pairs = df_string_ordered.select(["pair_key1", "pair_key2", "combined_score"]).unique(subset=["pair_key1", "pair_key2"])
-    
+    print(df_string_unique_pairs.collect().head())
+    print(df_all_mapped.collect().head())
     df_final_comparison = df_all_mapped.join(
             df_string_unique_pairs, on=["pair_key1", "pair_key2"], how="left"
         ).drop("pair_key1", "pair_key2")
     
+    print(df_final_comparison.collect()["combined_score"])
+
     return df_final_comparison.collect()
-    # return df_final_comparison.collect()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Global Score Pipeline Wrapper")
